@@ -1,0 +1,40 @@
+# Dossiers de build
+target/
+backend/
+dist/
+bin/
+
+# Dépendances
+node_modules/
+
+# Cache
+.cache/
+__pycache__/
+
+# IDE
+.vscode/
+.idea/
+
+# Logs
+*.log
+
+# Fichiers volumineux
+*.zip
+*.7z
+*.rar
+*.tar.gz
+*.mp4
+*.mov
+*.iso
+
+# Données
+dataset/
+data/
+uploads/
+tailwindcss.exe
+
+# Modèles IA
+*.onnx
+*.pt
+*.pth
+*.ckpt

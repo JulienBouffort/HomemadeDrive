@@ -1,0 +1,46 @@
+[package]
+name = "project-wedding"
+version = "0.1.0"
+authors = ["bouff"]
+edition = "2021"
+
+
+[dependencies]
+dioxus = { version = "0.7.1", features = ["router", "fullstack"] }
+gloo-net = { version = "0.6" }
+web-sys = { version = "0.3", features = ["Navigator", "Window"] }
+
+
+# Backend uniquement
+axum = { version = "0.8", optional = true }
+
+tokio = { version = "1", features = ["full"], optional = true }
+
+tower-http = { version = "0.6", features = ["cors", "trace", "fs"], optional = true }
+
+serde = { version = "1", features = ["derive"], optional = true }
+
+uuid = { version = "1", features = ["v4"], optional = true }
+reqwest = { version = "0.12", features = ["multipart"] }
+
+
+[features]
+default = ["web"]
+# The feature that are only required for the web = ["dioxus/web"] build target should be optional and only enabled in the web = ["dioxus/web"] feature
+web = ["dioxus/web"]
+# The feature that are only required for the desktop = ["dioxus/desktop"] build target should be optional and only enabled in the desktop = ["dioxus/desktop"] feature
+desktop = ["dioxus/desktop"]
+# The feature that are only required for the mobile = ["dioxus/mobile"] build target should be optional and only enabled in the mobile = ["dioxus/mobile"] feature
+mobile = ["dioxus/mobile"]
+# The feature that are only required for the server = ["dioxus/server"] build target should be optional and only enabled in the server = ["dioxus/server"] feature
+server = [
+    "dioxus/server",
+    "dep:axum",
+    "dep:tokio",
+    "dep:tower-http",
+    "dep:serde",
+    "dep:uuid"
+]
+
+
+

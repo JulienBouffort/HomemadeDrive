@@ -1,0 +1,10 @@
+[application]
+
+[web.app]
+title = "project-wedding"
+
+[web.resource]
+# plus de "tailwind = true", plus de "style = [...]"
+
+[web.resource.dev]
+script = []
