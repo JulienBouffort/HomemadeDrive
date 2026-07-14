@@ -1,4 +1,9 @@
 use dioxus::prelude::*;
+use std::path::PathBuf;
+
+fn uploads_dir() -> PathBuf {
+    PathBuf::from(r"D:\uploads")
+}
 
 
 #[server]
@@ -6,7 +11,7 @@ use dioxus::prelude::*;
 #[middleware(axum::extract::DefaultBodyLimit::max(500 * 1024 * 1024))]
 pub async fn upload_photo_server(bytes: Vec<u8>, file_name: String) -> Result<String, ServerFnError> {
     let base_dir = env!("CARGO_MANIFEST_DIR");
-    let uploads_dir = std::path::Path::new(base_dir).join("uploads");
+    let uploads_dir = uploads_dir();
     
     tokio::fs::create_dir_all(&uploads_dir).await.ok();
 
@@ -27,7 +32,7 @@ pub async fn upload_photo_server(bytes: Vec<u8>, file_name: String) -> Result<St
 #[get("/api/photos")]
 pub async fn list_photos() -> Result<Vec<String>> {
     let mut names = Vec::new();
-    let mut entries = tokio::fs::read_dir("uploads")
+    let mut entries = tokio::fs::read_dir(uploads_dir())
         .await
         .map_err(|e| ServerFnError::new(e.to_string()))?;
 

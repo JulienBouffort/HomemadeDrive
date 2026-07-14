@@ -5,7 +5,7 @@ mod components;
 mod models;
 mod services;
 
-
+const UPLOADS_DIR: &str = r"D:\uploads";
 
 fn main() {
     #[cfg(feature = "server")]
@@ -14,7 +14,7 @@ fn main() {
 
         dioxus::serve(|| async move {
             let router = dioxus::server::router(app::App)
-                .nest_service("/uploads", ServeDir::new("uploads"));
+                .nest_service("/uploads", ServeDir::new(UPLOADS_DIR));
 
             Ok(router)
         });
