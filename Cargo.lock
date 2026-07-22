@@ -4221,6 +4221,7 @@ version = "0.1.0"
 dependencies = [
  "axum",
  "dioxus",
+ "futures",
  "gloo-net",
  "reqwest",
  "serde",

@@ -1,5 +1,6 @@
 use dioxus::prelude::*;
 use crate::models::upload_state::PhotoFile;
+use crate::models::i18n::t;
 
 #[component]
 pub fn Lightbox(
@@ -69,7 +70,7 @@ pub fn Lightbox(
                 download: "{current}",
                 onclick: move |evt| evt.stop_propagation(),
                 class: "absolute bottom-4 right-4 bg-white/90 rounded-full px-4 py-2 shadow-md text-sm font-semibold",
-                "⬇️ Télécharger"
+                "{t(\"download_button\")}"
             }
 
             div { class: "absolute bottom-4 left-4 text-white/70 text-sm", "{index + 1} / {total}" }

@@ -1,5 +1,6 @@
 use dioxus::prelude::*;
 use crate::models::upload_state::{PhotoFile, UploadStatus};
+use crate::models::i18n::t;
 
 // Fonction utilitaire pour formater la taille
 fn format_size(bytes: usize) -> String {
@@ -46,22 +47,22 @@ pub fn FileList(photos: Signal<Vec<PhotoFile>>) -> Element {
                             // 🚀 On gère Idle OU Ready avec la même ligne
                             UploadStatus::Idle | UploadStatus::Ready => rsx! {
                                 span { class: "px-2.5 py-1 text-xs font-medium rounded-full bg-blue-50 text-blue-600 border border-blue-100 shrink-0",
-                                    "Prêt"
+                                    "{t(\"ready_state\")}"
                                 }
                             },
                             UploadStatus::Uploading => rsx! {
                                 span { class: "px-2.5 py-1 text-xs font-medium rounded-full bg-amber-50 text-amber-600 border border-amber-100 animate-pulse shrink-0",
-                                    "Envoi..."
+                                    "{t(\"uploading_state\")}"
                                 }
                             },
                             UploadStatus::Completed => rsx! {
                                 span { class: "px-2.5 py-1 text-xs font-medium rounded-full bg-emerald-50 text-emerald-600 border border-emerald-100 shrink-0",
-                                    "Enregistré ✓"
+                                    "{t(\"completed_state\")}"
                                 }
                             },
                             UploadStatus::Error => rsx! {
                                 span { class: "px-2.5 py-1 text-xs font-medium rounded-full bg-rose-50 text-rose-600 border border-rose-100 shrink-0",
-                                    "Erreur ❌"
+                                    "{t(\"error_state\")}"
                                 }
                             },
                         }

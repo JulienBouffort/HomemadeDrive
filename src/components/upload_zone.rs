@@ -1,7 +1,7 @@
 use dioxus::prelude::*;
 use crate::models::upload_state::{PhotoFile, UploadStatus};
-// On importe la fonction serveur que l'on vient de créer
-use crate::services::upload_services::upload_photo_server; 
+
+use crate::services::upload_services::upload_photo;
 
 use crate::models::i18n::t;
 
@@ -22,12 +22,12 @@ pub fn UploadZone(mut photos: Signal<Vec<PhotoFile>>) -> Element {
                         stroke_linecap: "round",
                         stroke_linejoin: "round",
                         stroke_width: "2",
-                        d: "0 0 24 24 M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z",
+                        d: "M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z",
                     }
                 }
             }
 
-            span { class: "mt-4 text-sm font-semibold text-gray-700", "{t(\"drag_drop\")}" }
+            span { class: "mt-4 text-lg font-extrabold text-gray-850 block text-center", "{t(\"drag_drop\")}" }
             span { class: "mt-1 text-xs text-gray-500", "{t(\"browse_files\")}" }
 
             input {

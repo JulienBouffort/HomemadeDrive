@@ -5,7 +5,7 @@ use axum::extract::Multipart;
 #[cfg(feature = "server")]
 use tokio::io::AsyncWriteExt;
 
-// 🚀 ROUTE SERVEUR AXUM : Upload en streaming multipart
+// 🚀 Route d'upload en streaming multipart (remplace l'ancien #[server])
 #[cfg(feature = "server")]
 pub async fn upload_photo_handler(
     mut multipart: Multipart,
@@ -13,6 +13,8 @@ pub async fn upload_photo_handler(
     let base_dir = env!("CARGO_MANIFEST_DIR");
     let uploads_dir = std::path::Path::new(base_dir).join("uploads");
     tokio::fs::create_dir_all(&uploads_dir).await.ok();
+
+    println!("👉 LE DOSSIER UPLOADS SE TROUVE ICI : {}", uploads_dir.display());
 
     while let Some(mut field) = multipart
         .next_field()
@@ -37,32 +39,6 @@ pub async fn upload_photo_handler(
                 .map_err(|e| (axum::http::StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
         }
 
-        // 🔄 Conversion HEIC/HEIF -> JPEG si nécessaire
-        let lower_name = unique_name.to_lowercase();
-        if lower_name.ends_with(".heic") || lower_name.ends_with(".heif") {
-            let jpeg_name = format!("{}.jpg", unique_name);
-            let jpeg_path = uploads_dir.join(&jpeg_name);
-
-            let output = tokio::process::Command::new("heif-convert")
-                .arg(&file_path)
-                .arg(&jpeg_path)
-                .output()
-                .await;
-
-            match output {
-                Ok(o) if o.status.success() => {
-                    println!("🔄 Converti en JPEG : {}", jpeg_name);
-                    return Ok(axum::Json(jpeg_name));
-                }
-                Ok(o) => {
-                    println!("⚠️ Échec conversion HEIC : {}", String::from_utf8_lossy(&o.stderr));
-                }
-                Err(e) => {
-                    println!("⚠️ heif-convert introuvable : {}", e);
-                }
-            }
-        }
-
         println!("📸 Image sauvegardée avec succès : {}", unique_name);
         return Ok(axum::Json(unique_name));
     }
@@ -70,6 +46,8 @@ pub async fn upload_photo_handler(
     Err((axum::http::StatusCode::BAD_REQUEST, "Aucun fichier reçu".into()))
 }
 
+// 📤 Fonction CLIENT qui appelle la route ci-dessus via reqwest multipart
+#[cfg(not(feature = "server"))]
 pub async fn upload_photo(bytes: Vec<u8>, file_name: String) -> Result<String, String> {
     let part = reqwest::multipart::Part::bytes(bytes)
         .file_name(file_name)
@@ -78,37 +56,23 @@ pub async fn upload_photo(bytes: Vec<u8>, file_name: String) -> Result<String, S
 
     let form = reqwest::multipart::Form::new().part("file", part);
 
-    // 💡 Récupération dynamique de l'URL
-    let mut api_url = "/api/upload".to_string();
-
-    #[cfg(not(feature = "server"))]
-    {
-        if let Some(window) = web_sys::window() {
-            // 🛠️ Correction ici : window.location() n'est pas un Result, on l'appelle directement
-            let location = window.location(); 
-            if let Ok(origin) = location.origin() {
-                api_url = format!("{}{}", origin, "/api/upload");
-            }
-        }
-    }
-
     let res = reqwest::Client::new()
-        .post(&api_url)
+        .post("/api/upload")
         .multipart(form)
         .send()
         .await
-        .map_err(|e| format!("Erreur réseau : {}", e))?;
+        .map_err(|e| e.to_string())?;
 
     if !res.status().is_success() {
         return Err(format!("Échec de l'upload : {}", res.status()));
     }
 
-    res.json::<String>().await.map_err(|e| format!("Erreur JSON : {}", e))
+    res.json::<String>().await.map_err(|e| e.to_string())
 }
 
-// 📋 FONCTION SERVEUR DIOXUS : Liste des photos déjà uploadées
-#[server]
-pub async fn list_photos() -> Result<Vec<String>, ServerFnError> {
+// 📋 Liste des photos déjà uploadées (server function, inchangée)
+#[get("/api/photos")]
+pub async fn list_photos() -> Result<Vec<String>> {
     let mut names = Vec::new();
     let mut entries = tokio::fs::read_dir("uploads")
         .await
