@@ -1,47 +1,74 @@
-use dioxus::prelude::*;
-
 #[cfg(feature = "server")]
 use axum::extract::Multipart;
 #[cfg(feature = "server")]
+use axum::http::StatusCode;
+#[cfg(feature = "server")]
 use tokio::io::AsyncWriteExt;
 
-// 🚀 ROUTE SERVEUR AXUM : Upload en streaming multipart
+/// Paramètres de la requête : `/api/upload?path=dossier/sous-dossier`
+#[cfg(feature = "server")]
+#[derive(serde::Deserialize)]
+pub struct UploadParams {
+    #[serde(default)]
+    pub path: String,
+}
+
+#[cfg(feature = "server")]
+fn internal(e: impl ToString) -> (StatusCode, String) {
+    (StatusCode::INTERNAL_SERVER_ERROR, e.to_string())
+}
+
+#[cfg(feature = "server")]
+fn bad_request(e: impl ToString) -> (StatusCode, String) {
+    (StatusCode::BAD_REQUEST, e.to_string())
+}
+
+// 🚀 ROUTE SERVEUR AXUM : Upload en streaming multipart dans le dossier `path`
 #[cfg(feature = "server")]
 pub async fn upload_photo_handler(
+    axum::extract::Query(params): axum::extract::Query<UploadParams>,
     mut multipart: Multipart,
-) -> Result<axum::Json<String>, (axum::http::StatusCode, String)> {
-    let base_dir = env!("CARGO_MANIFEST_DIR");
-    let uploads_dir = std::path::Path::new(base_dir).join("uploads");
-    tokio::fs::create_dir_all(&uploads_dir).await.ok();
+) -> Result<axum::Json<String>, (StatusCode, String)> {
+    use crate::services::drive_services::{resolve_path, sanitize_upload_name, unique_path};
 
-    while let Some(mut field) = multipart
-        .next_field()
-        .await
-        .map_err(|e| (axum::http::StatusCode::BAD_REQUEST, e.to_string()))?
-    {
-        let file_name = field.file_name().unwrap_or("photo.jpg").to_string();
-        let unique_name = format!("{}-{}", uuid::Uuid::new_v4(), file_name);
-        let file_path = uploads_dir.join(&unique_name);
+    let dir = resolve_path(&params.path).map_err(bad_request)?;
+    if params.path.trim_matches('/').is_empty() {
+        tokio::fs::create_dir_all(&dir).await.map_err(internal)?;
+    } else if !tokio::fs::metadata(&dir).await.map(|m| m.is_dir()).unwrap_or(false) {
+        return Err((StatusCode::NOT_FOUND, "Dossier de destination introuvable".into()));
+    }
 
-        let mut file = tokio::fs::File::create(&file_path)
-            .await
-            .map_err(|e| (axum::http::StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    while let Some(mut field) = multipart.next_field().await.map_err(bad_request)? {
+        let raw_name = field.file_name().unwrap_or("fichier").to_string();
+        let name = sanitize_upload_name(&raw_name);
+        // Pas de doublon : "photo.jpg" -> "photo (1).jpg" si le nom existe déjà
+        let file_path = unique_path(&dir, &name).await;
+        let saved_name = file_path
+            .file_name()
+            .and_then(|n| n.to_str())
+            .unwrap_or(&name)
+            .to_string();
 
-        while let Some(chunk) = field
-            .chunk()
-            .await
-            .map_err(|e| (axum::http::StatusCode::BAD_REQUEST, e.to_string()))?
-        {
-            file.write_all(&chunk)
-                .await
-                .map_err(|e| (axum::http::StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+        let written: Result<(), (StatusCode, String)> = async {
+            let mut file = tokio::fs::File::create(&file_path).await.map_err(internal)?;
+            while let Some(chunk) = field.chunk().await.map_err(bad_request)? {
+                file.write_all(&chunk).await.map_err(internal)?;
+            }
+            file.flush().await.map_err(internal)?;
+            Ok(())
+        }
+        .await;
+
+        if let Err(e) = written {
+            // On ne laisse pas un fichier à moitié écrit
+            let _ = tokio::fs::remove_file(&file_path).await;
+            return Err(e);
         }
 
-        // 🔄 Conversion HEIC/HEIF -> JPEG si nécessaire
-        let lower_name = unique_name.to_lowercase();
+        // 🔄 Conversion HEIC/HEIF -> JPEG si nécessaire (l'original est conservé)
+        let lower_name = saved_name.to_lowercase();
         if lower_name.ends_with(".heic") || lower_name.ends_with(".heif") {
-            let jpeg_name = format!("{}.jpg", unique_name);
-            let jpeg_path = uploads_dir.join(&jpeg_name);
+            let jpeg_path = unique_path(&dir, &format!("{}.jpg", saved_name)).await;
 
             let output = tokio::process::Command::new("heif-convert")
                 .arg(&file_path)
@@ -51,6 +78,11 @@ pub async fn upload_photo_handler(
 
             match output {
                 Ok(o) if o.status.success() => {
+                    let jpeg_name = jpeg_path
+                        .file_name()
+                        .and_then(|n| n.to_str())
+                        .unwrap_or(&saved_name)
+                        .to_string();
                     println!("🔄 Converti en JPEG : {}", jpeg_name);
                     return Ok(axum::Json(jpeg_name));
                 }
@@ -63,17 +95,18 @@ pub async fn upload_photo_handler(
             }
         }
 
-        println!("📸 Image sauvegardée avec succès : {}", unique_name);
-        return Ok(axum::Json(unique_name));
+        println!("📁 Fichier sauvegardé : {}/{}", params.path, saved_name);
+        return Ok(axum::Json(saved_name));
     }
 
-    Err((axum::http::StatusCode::BAD_REQUEST, "Aucun fichier reçu".into()))
+    Err((StatusCode::BAD_REQUEST, "Aucun fichier reçu".into()))
 }
 
-pub async fn upload_photo(bytes: Vec<u8>, file_name: String) -> Result<String, String> {
+/// 📤 Envoie un fichier (n'importe quel type) dans le dossier `dir` du drive.
+pub async fn upload_photo(bytes: Vec<u8>, file_name: String, dir: String) -> Result<String, String> {
     let part = reqwest::multipart::Part::bytes(bytes)
         .file_name(file_name)
-        .mime_str("image/jpeg")
+        .mime_str("application/octet-stream")
         .map_err(|e| e.to_string())?;
 
     let form = reqwest::multipart::Form::new().part("file", part);
@@ -84,8 +117,7 @@ pub async fn upload_photo(bytes: Vec<u8>, file_name: String) -> Result<String, S
     #[cfg(not(feature = "server"))]
     {
         if let Some(window) = web_sys::window() {
-            // 🛠️ Correction ici : window.location() n'est pas un Result, on l'appelle directement
-            let location = window.location(); 
+            let location = window.location();
             if let Ok(origin) = location.origin() {
                 api_url = format!("{}{}", origin, "/api/upload");
             }
@@ -94,6 +126,7 @@ pub async fn upload_photo(bytes: Vec<u8>, file_name: String) -> Result<String, S
 
     let res = reqwest::Client::new()
         .post(&api_url)
+        .query(&[("path", dir)])
         .multipart(form)
         .send()
         .await
@@ -104,25 +137,4 @@ pub async fn upload_photo(bytes: Vec<u8>, file_name: String) -> Result<String, S
     }
 
     res.json::<String>().await.map_err(|e| format!("Erreur JSON : {}", e))
-}
-
-// 📋 FONCTION SERVEUR DIOXUS : Liste des photos déjà uploadées
-#[server]
-pub async fn list_photos() -> Result<Vec<String>, ServerFnError> {
-    let mut names = Vec::new();
-    let mut entries = tokio::fs::read_dir("uploads")
-        .await
-        .map_err(|e| ServerFnError::new(e.to_string()))?;
-
-    while let Some(entry) = entries
-        .next_entry()
-        .await
-        .map_err(|e| ServerFnError::new(e.to_string()))?
-    {
-        if let Some(name) = entry.file_name().to_str() {
-            names.push(name.to_string());
-        }
-    }
-
-    Ok(names)
 }

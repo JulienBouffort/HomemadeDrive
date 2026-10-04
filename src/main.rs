@@ -21,7 +21,7 @@ fn main() {
                 .allow_headers(Any);
 
             let router = dioxus::server::router(app::App)
-                .nest_service("/uploads", ServeDir::new("uploads"))
+                .nest_service("/uploads", ServeDir::new(services::drive_services::uploads_root()))
                 .route("/api/upload", axum::routing::post(services::upload_services::upload_photo_handler))
                 .layer(axum::extract::DefaultBodyLimit::max(500 * 1024 * 1024))
                 .layer(cors); // 💡 On applique le CORS ici

@@ -10,7 +10,7 @@ use crate::components::{
     header::Header,
     status::Status,
     upload_zone::UploadZone,
-    gallery::{Gallery, GALLERY_REFRESH},
+    gallery::{Gallery, CURRENT_DIR, GALLERY_REFRESH},
 };
 pub fn App() -> Element {
     let mut photos = use_signal(Vec::<PhotoFile>::new);
@@ -31,7 +31,11 @@ pub fn App() -> Element {
         }
     });
 
-    // Calcul du nombre de photos prêtes
+    // Dossier de destination des prochains uploads (= dossier affiché dans l'explorateur)
+    let current_dir = CURRENT_DIR();
+    let upload_to_label = t("upload_to");
+
+    // Calcul du nombre de fichiers prêts
     let ready_count = photos.read()
         .iter()
         .filter(|p| p.status == UploadStatus::Idle) // ou votre statut d'attente
@@ -44,6 +48,10 @@ pub fn App() -> Element {
 
                 Header {}
 
+                p { class: "mt-4 text-sm text-center text-gray-500",
+                    "{upload_to_label} 📁 /{current_dir}"
+                }
+
                 // La zone de drop interactive
                 UploadZone { photos }
 
@@ -54,12 +62,15 @@ pub fn App() -> Element {
                 if !photos.read().is_empty() {
                     div { class: "mt-8 pt-6 border-t border-gray-100 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4",
                         span { class: "text-gray-600 font-medium text-center sm:text-left",
-                            "✨ {ready_count} photo(s) prête(s) à être partagée(s)"
+                            "✨ {ready_count} {t(\"files_ready\")}"
                         }
                         button {
                             class: "px-8 py-3.5 rounded-2xl bg-gradient-to-r from-rose-500 to-pink-500 text-white font-bold shadow-lg shadow-pink-500/20 hover:shadow-pink-500/30 hover:scale-[1.02] active:scale-[0.98] transition-all duration-200 flex items-center justify-center gap-2",
                             onclick: move |_| {
                                 spawn(async move {
+                                    // 0. Dossier de destination, figé au moment du clic
+                                    let upload_dir = CURRENT_DIR();
+
                                     // 1. On extrait la liste des photos prêtes à être envoyées
                                     let pending_photos: Vec<(String, Vec<u8>)> = photos
                                         .read()
@@ -79,8 +90,9 @@ pub fn App() -> Element {
 
                                     // 3. On lance tous les uploads en parallèle
                                     let upload_futures = pending_photos.into_iter().map(|(name, bytes)| {
+                                        let dir = upload_dir.clone();
                                         async move {
-                                            let result = upload_photo(bytes, name.clone()).await;
+                                            let result = upload_photo(bytes, name.clone(), dir).await;
                                             (name, result)
                                         }
                                     });

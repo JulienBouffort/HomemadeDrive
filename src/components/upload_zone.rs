@@ -1,10 +1,7 @@
-use dioxus::prelude::*;
 use crate::models::upload_state::{PhotoFile, UploadStatus};
-
-use crate::services::upload_services::upload_photo;
+use dioxus::prelude::*;
 
 use crate::models::i18n::t;
-
 
 #[component]
 pub fn UploadZone(mut photos: Signal<Vec<PhotoFile>>) -> Element {
@@ -34,7 +31,6 @@ pub fn UploadZone(mut photos: Signal<Vec<PhotoFile>>) -> Element {
                 r#type: "file",
                 class: "hidden", // On cache l'input moche du navigateur
                 multiple: true,
-                accept: "image/*,video/*",
                 onchange: move |evt| {
                     let files = evt.files();
 

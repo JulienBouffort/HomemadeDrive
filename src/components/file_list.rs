@@ -22,7 +22,7 @@ pub fn FileList(photos: Signal<Vec<PhotoFile>>) -> Element {
     rsx! {
         div { class: "mt-8",
             h3 { class: "text-xs font-bold text-gray-400 uppercase tracking-wider mb-3",
-                "Photos sélectionnées"
+                "{t(\"selected_files\")}"
             }
 
             // Grille CSS fluide
@@ -33,7 +33,7 @@ pub fn FileList(photos: Signal<Vec<PhotoFile>>) -> Element {
                         // Infos du fichier (Icône + Nom + Taille)
                         div { class: "flex items-center gap-3 min-w-0",
                             div { class: "p-2 bg-rose-100 text-rose-600 rounded-lg shrink-0",
-                                "📸"
+                                "📄"
                             }
                             div { class: "min-w-0",
                                 p { class: "text-sm font-semibold text-gray-700 truncate pr-2",
